@@ -115,8 +115,8 @@ nginx configuration structure.
 
 - name: Installing static files
   template_tree:
-    # Postfix directories with a slash to copy only their contents. Leave
-    # the slash out to also generate the source directory on the host.
+    # Add a trailing slash to directories to copy only their contents.
+    # Leave the slash out to also generate the source directory on the host.
     # (just like rsync)
     src: hosts/{{ inventory_hostname_short }}/static_files/
     dest: /srv/http/static
