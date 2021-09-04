@@ -231,7 +231,7 @@ class ActionModule(ActionBase):
             loader=self._loader,
             templar=self._templar,
         )
-        return template_lookup.run([path], variables=task_vars)[0]
+        return template_lookup.run([path], convert_data=False, variables=task_vars)[0]
 
     def _get_local_file_contents(self, path):
         self._display.vvvv(f"File lookup using '{path}' as file")
