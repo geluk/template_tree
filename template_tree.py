@@ -149,11 +149,12 @@ class ActionModule(ActionBase):
             for warning in result["warnings"]:
                 self._display.warning(warning)
 
-        # If there are warnings returned by the module, they may also be present
-        # in the message, so we only check the message if we haven't printed
-        # any warnings yet.
-        elif "msg" in result and result["msg"]:
-            self._display.warning(result["msg"], formatted=True)
+        # The find module always returns a message, either that all paths have been
+        # examined, or that not all paths have been examined. In the second case, more
+        # specific information is included as warnings, which are printed above. Because
+        # of that, this message is not relevant during normal operation.
+        if "msg" in result and result["msg"]:
+            self._display.v(f"find module message: {result['msg']}")
 
         # Be explicit about the keys we use.
         filetree_used_keys = {"path", "isdir", "isreg"}
