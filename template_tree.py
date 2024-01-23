@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 from ansible.errors import AnsibleError, AnsibleParserError
 from ansible.plugins.action import ActionBase
 from pathlib import PurePath
