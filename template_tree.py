@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 from ansible.errors import AnsibleError, AnsibleParserError
 from ansible.plugins.action import ActionBase
 from pathlib import PurePath
@@ -164,7 +162,30 @@ class ActionModule(ActionBase):
         ]
 
         for entry in entries:
-            entry["path"] = PurePath(entry["path"])
+            # Since Ansible 9.0, the find module returns its results as
+            # AnsibleUnsafeText instead of str. AnsibleUnsafeText is a subclass of str,
+            # which is used to prevent accidental templating. As it is a subclass of
+            # str, in most cases, this change is invisible to us. Unfortunately, pathlib
+            # calls the string interner on its arguments, which does not accept a
+            # subclass of str and instead throws an error.
+            # To fix this, we have to convert entry["path"] into an actual str object.
+            # This is difficult, because it is already a str subclass and Python
+            # optimizes a lot of more obvious attempts away because it sees them as
+            # no-ops. The following attempts still return AnsibleUnsafeText objects.
+            #
+            # * str(entry["path"])
+            # * f"{entry['path']}"
+            # * "" + entry["path"]
+            # * entry["path"][:]
+            #
+            # We want to avoid depending on some Python optimization behaviour, which
+            # may change between releases. Instead, we make sure that we modify the
+            # string without changing its semantics, which will force the creation of a
+            # new str object. Luckily, pathlib collapses spurious dots in paths, so we
+            # can add /. at the end of the path. Note that adding ./ to the front of a
+            # path may change its semantics when it is an absolute path (i.e. ".//foo"
+            # is interpreted as "foo").
+            entry["path"] = PurePath(f"{entry['path']}/.")
 
         return entries
 
