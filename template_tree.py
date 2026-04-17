@@ -4,7 +4,7 @@ import stat
 from pathlib import PurePath
 
 import ansible.module_utils.common.text.converters as converters
-from ansible.errors import AnsibleError, AnsibleParserError
+from ansible.errors import AnsibleActionFail, AnsibleParserError
 from ansible.plugins.action import ActionBase
 
 
@@ -70,11 +70,11 @@ class ActionModule(ActionBase):
             return list(map(PurePath, paths))
         except TypeError:
             if is_list:
-                raise AnsibleError(
+                raise AnsibleActionFail(
                     f"Argument '{argname}' contains one or more values of an invalid type"
                 )
             else:
-                raise AnsibleError(f"Argument '{argname}' is of an invalid type")
+                raise AnsibleActionFail(f"Argument '{argname}' is of an invalid type")
 
     def _get_local_entries(self, local_paths, task_vars):
         entries = []
@@ -237,7 +237,7 @@ class ActionModule(ActionBase):
             contents, _ = self._loader._get_file_contents(path)
             return converters.to_text(contents, errors="surrogate_or_strict")
         except AnsibleParserError:
-            raise AnsibleError(f"could not locate file in lookup: {path}")
+            raise AnsibleActionFail(f"could not locate file in lookup: {path}")
 
     def _get_entries_to_delete(
         self,
@@ -328,7 +328,7 @@ class ActionModule(ActionBase):
             )
 
             if res.get("failed", False):
-                raise AnsibleError(res["msg"])
+                raise AnsibleActionFail(res["msg"])
             yield res
 
     def _create_entries(self, entries, task_vars):
@@ -339,7 +339,7 @@ class ActionModule(ActionBase):
                 result = self._create_directory(entry, task_vars)
 
             if result.get("failed", False):
-                raise AnsibleError(result["msg"])
+                raise AnsibleActionFail(result["msg"])
             yield result
 
     def _copy_file(self, file, task_vars):
