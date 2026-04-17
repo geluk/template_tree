@@ -256,12 +256,17 @@ class ActionModule(ActionBase):
         # For convenience, we'll allow specifying absolute ignore paths.
         # We rewrite them to relative paths here, so our comparison of a
         # relative path to another relative path below works.
-        exclusive_ignore = list(
-            map(
-                lambda i: i.relative_to(remote_path) if i.is_absolute() else i,
-                exclusive_ignore,
-            )
-        )
+        normalized_exclusive_ignore = []
+        for ign in exclusive_ignore:
+            if ign.is_absolute():
+                if not ign.is_relative_to(remote_path):
+                    self._display.warning(
+                        f"exclusive_ignore path '{ign}' is not a subpath of '{remote_path}'"
+                    )
+                    continue
+                ign = ign.relative_to(remote_path)
+            normalized_exclusive_ignore.append(ign)
+        exclusive_ignore = normalized_exclusive_ignore
 
         for remote_entry in remote_entries:
             absolute_path: PurePath = remote_entry["path"]
