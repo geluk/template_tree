@@ -380,6 +380,7 @@ class ActionModule(ActionBase):
         )
 
     def _build_output(self, output, operation_results):
+        output["changed"] = False
         output["deleted_entries"] = []
         output["managed_directories"] = []
         output["managed_files"] = []
