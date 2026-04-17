@@ -112,13 +112,13 @@ class ActionModule(ActionBase):
                 ),
             )
 
-            filetree_lookup = self._shared_loader_obj.lookup_loader.get(
-                "community.general.filetree", loader=self._loader
-            )
-            # Filetree supports passing multiple paths, and will handle duplicates
-            # for us, by only returning the first entry it finds for a given
-            # relative path.
-            entries += filetree_lookup.run(local_paths, variables=task_vars)
+        filetree_lookup = self._shared_loader_obj.lookup_loader.get(
+            "community.general.filetree", loader=self._loader
+        )
+        # Filetree supports passing multiple paths, and will handle duplicates
+        # for us, by only returning the first entry it finds for a given
+        # relative path.
+        entries += filetree_lookup.run(local_paths, variables=task_vars)
 
         # Be explicit about the keys we use.
         filetree_used_keys = {"root", "path", "state", "src"}
