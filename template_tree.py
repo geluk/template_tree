@@ -142,8 +142,14 @@ class ActionModule(ActionBase):
             tmp=None,
         )
 
+        # ansible-core 2.21 signals warnings through some execution context,
+        # so this wiring can be removed when that's the oldest supported version
         if "warnings" in result:
             for warning in result["warnings"]:
+                # ansible-core 2.19 and 2.20 return module warnings as
+                # WarningSummary dataclasses instead of plain strings.
+                if not isinstance(warning, str):
+                    warning = warning.event.msg
                 self._display.warning(warning)
 
         # The find module always returns a message, either that all paths have been
