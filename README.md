@@ -135,3 +135,17 @@ the `action_plugins` directory in the directory that contains your playbooks.
 
 For more information, see [adding a plugin locally](https://docs.ansible.com/ansible/latest/dev_guide/developing_locally.html#adding-a-plugin-locally)
 on Ansible.
+
+# Testing
+
+The test harness runs the plugin against a matrix of ansible-core versions
+ using
+[Nox](https://nox.thea.codes/) and [Molecule](https://ansible.readthedocs.io/projects/molecule/).
+
+## Running
+
+Run the full matrix (one session per ansible-core version):
+
+```console
+$ uvx nox
+```

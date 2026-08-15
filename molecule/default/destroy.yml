@@ -1,0 +1,12 @@
+---
+
+- name: Destroy test environment
+  hosts: all
+  gather_facts: false
+  vars:
+    test_root: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/test-root"
+  tasks:
+    - name: Remove test root
+      ansible.builtin.file:
+        path: "{{ test_root }}"
+        state: absent
