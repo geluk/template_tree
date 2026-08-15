@@ -130,7 +130,18 @@ class ActionModule(ActionBase):
         return entries
 
     def _get_remote_entries(self, remote_path, task_vars):
-        result = self._execute_module(
+        # The destination directory is created by this plugin, and find on a
+        # missing path only produces a misleading warning.
+        stat_result = self._execute_module(
+            module_name="ansible.builtin.stat",
+            module_args=dict(path=remote_path),
+            task_vars=task_vars,
+            tmp=None,
+        )
+        if not stat_result.get("stat", {}).get("isdir"):
+            return []
+
+        find_result = self._execute_module(
             module_name="ansible.builtin.find",
             module_args=dict(
                 file_type="any",
@@ -144,8 +155,8 @@ class ActionModule(ActionBase):
 
         # ansible-core 2.21 signals warnings through some execution context,
         # so this wiring can be removed when that's the oldest supported version
-        if "warnings" in result:
-            for warning in result["warnings"]:
+        if "warnings" in find_result:
+            for warning in find_result["warnings"]:
                 # ansible-core 2.19 and 2.20 return module warnings as
                 # WarningSummary dataclasses instead of plain strings.
                 if not isinstance(warning, str):
@@ -156,14 +167,14 @@ class ActionModule(ActionBase):
         # examined, or that not all paths have been examined. In the second case, more
         # specific information is included as warnings, which are printed above. Because
         # of that, this message is not relevant during normal operation.
-        if "msg" in result and result["msg"]:
-            self._display.v(f"find module message: {result['msg']}")
+        if "msg" in find_result and find_result["msg"]:
+            self._display.v(f"find module message: {find_result['msg']}")
 
         # Be explicit about the keys we use.
         filetree_used_keys = {"path", "isdir", "isreg"}
         entries = [
             {key: value for key, value in entry.items() if key in filetree_used_keys}
-            for entry in result["files"]
+            for entry in find_result["files"]
         ]
 
         for entry in entries:
