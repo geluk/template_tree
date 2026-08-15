@@ -1,12 +1,11 @@
-from ansible.errors import AnsibleError, AnsibleParserError
-from ansible.plugins.action import ActionBase
-from pathlib import PurePath
-
 import os
 import os.path as path
 import stat
+from pathlib import PurePath
 
 import ansible.module_utils.common.text.converters as converters
+from ansible.errors import AnsibleError, AnsibleParserError
+from ansible.plugins.action import ActionBase
 
 
 class ActionModule(ActionBase):
@@ -17,7 +16,7 @@ class ActionModule(ActionBase):
         output = super(ActionModule, self).run(tmp, task_vars)
 
         for arg in self.REQUIRED_ARGS:
-            if not arg in self._task.args:
+            if arg not in self._task.args:
                 output["failed"] = True
                 output["msg"] = f"missing required argument '{arg}'"
                 return output
@@ -69,7 +68,7 @@ class ActionModule(ActionBase):
 
         try:
             return list(map(PurePath, paths))
-        except:
+        except TypeError:
             if is_list:
                 raise AnsibleError(
                     f"Argument '{argname}' contains one or more values of an invalid type"
