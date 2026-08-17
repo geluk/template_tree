@@ -1,12 +1,11 @@
-from ansible.errors import AnsibleError, AnsibleParserError
-from ansible.plugins.action import ActionBase
-from pathlib import PurePath
-
 import os
 import os.path as path
 import stat
+from pathlib import PurePath
 
 import ansible.module_utils.common.text.converters as converters
+from ansible.errors import AnsibleActionFail, AnsibleParserError
+from ansible.plugins.action import ActionBase
 
 
 class ActionModule(ActionBase):
@@ -17,7 +16,7 @@ class ActionModule(ActionBase):
         output = super(ActionModule, self).run(tmp, task_vars)
 
         for arg in self.REQUIRED_ARGS:
-            if not arg in self._task.args:
+            if arg not in self._task.args:
                 output["failed"] = True
                 output["msg"] = f"missing required argument '{arg}'"
                 return output
@@ -69,13 +68,13 @@ class ActionModule(ActionBase):
 
         try:
             return list(map(PurePath, paths))
-        except:
+        except TypeError:
             if is_list:
-                raise AnsibleError(
+                raise AnsibleActionFail(
                     f"Argument '{argname}' contains one or more values of an invalid type"
                 )
             else:
-                raise AnsibleError(f"Argument '{argname}' is of an invalid type")
+                raise AnsibleActionFail(f"Argument '{argname}' is of an invalid type")
 
     def _get_local_entries(self, local_paths, task_vars):
         entries = []
@@ -143,8 +142,14 @@ class ActionModule(ActionBase):
             tmp=None,
         )
 
+        # ansible-core 2.21 signals warnings through some execution context,
+        # so this wiring can be removed when that's the oldest supported version
         if "warnings" in result:
             for warning in result["warnings"]:
+                # ansible-core 2.19 and 2.20 return module warnings as
+                # WarningSummary dataclasses instead of plain strings.
+                if not isinstance(warning, str):
+                    warning = warning.event.msg
                 self._display.warning(warning)
 
         # The find module always returns a message, either that all paths have been
@@ -162,30 +167,7 @@ class ActionModule(ActionBase):
         ]
 
         for entry in entries:
-            # Since Ansible 9.0, the find module returns its results as
-            # AnsibleUnsafeText instead of str. AnsibleUnsafeText is a subclass of str,
-            # which is used to prevent accidental templating. As it is a subclass of
-            # str, in most cases, this change is invisible to us. Unfortunately, pathlib
-            # calls the string interner on its arguments, which does not accept a
-            # subclass of str and instead throws an error.
-            # To fix this, we have to convert entry["path"] into an actual str object.
-            # This is difficult, because it is already a str subclass and Python
-            # optimizes a lot of more obvious attempts away because it sees them as
-            # no-ops. The following attempts still return AnsibleUnsafeText objects.
-            #
-            # * str(entry["path"])
-            # * f"{entry['path']}"
-            # * "" + entry["path"]
-            # * entry["path"][:]
-            #
-            # We want to avoid depending on some Python optimization behaviour, which
-            # may change between releases. Instead, we make sure that we modify the
-            # string without changing its semantics, which will force the creation of a
-            # new str object. Luckily, pathlib collapses spurious dots in paths, so we
-            # can add /. at the end of the path. Note that adding ./ to the front of a
-            # path may change its semantics when it is an absolute path (i.e. ".//foo"
-            # is interpreted as "foo").
-            entry["path"] = PurePath(f"{entry['path']}/.")
+            entry["path"] = PurePath(entry["path"])
 
         return entries
 
@@ -253,7 +235,7 @@ class ActionModule(ActionBase):
             loader=self._loader,
             templar=self._templar,
         )
-        return template_lookup.run([path], convert_data=False, variables=task_vars)[0]
+        return template_lookup.run([path], variables=task_vars)[0]
 
     def _get_local_file_contents(self, path):
         self._display.vvvv(f"File lookup using '{path}' as file")
@@ -261,7 +243,7 @@ class ActionModule(ActionBase):
             contents, _ = self._loader._get_file_contents(path)
             return converters.to_text(contents, errors="surrogate_or_strict")
         except AnsibleParserError:
-            raise AnsibleError(f"could not locate file in lookup: {path}")
+            raise AnsibleActionFail(f"could not locate file in lookup: {path}")
 
     def _get_entries_to_delete(
         self,
@@ -352,7 +334,7 @@ class ActionModule(ActionBase):
             )
 
             if res.get("failed", False):
-                raise AnsibleError(res["msg"])
+                raise AnsibleActionFail(res["msg"])
             yield res
 
     def _create_entries(self, entries, task_vars):
@@ -363,7 +345,7 @@ class ActionModule(ActionBase):
                 result = self._create_directory(entry, task_vars)
 
             if result.get("failed", False):
-                raise AnsibleError(result["msg"])
+                raise AnsibleActionFail(result["msg"])
             yield result
 
     def _copy_file(self, file, task_vars):
@@ -404,6 +386,7 @@ class ActionModule(ActionBase):
         )
 
     def _build_output(self, output, operation_results):
+        output["changed"] = False
         output["deleted_entries"] = []
         output["managed_directories"] = []
         output["managed_files"] = []
