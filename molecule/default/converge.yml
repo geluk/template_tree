@@ -1,0 +1,78 @@
+---
+
+- name: Converge
+  hosts: all
+  gather_facts: false
+  vars:
+    test_root: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/test-root"
+    http_port: 8080
+    http_host: example.internal
+  tasks:
+    - name: Basic tree copy with modes
+      template_tree:
+        src: tree_a/
+        dest: "{{ test_root }}/basic"
+        file_mode: 0644
+        directory_mode: 0755
+      register: basic_result
+
+    - name: Templated copy
+      template_tree:
+        src: tree_a/
+        dest: "{{ test_root }}/templated"
+      register: templated_result
+
+    - name: Merge multiple sources and a single file
+      template_tree:
+        src:
+          - tree_a/
+          - tree_b/
+          - single.txt
+        dest: "{{ test_root }}/merged"
+      register: merge_result
+
+    - name: Single file source (string form)
+      template_tree:
+        src: single.txt
+        dest: "{{ test_root }}/single"
+      register: single_result
+
+    - name: Directory source without trailing slash
+      template_tree:
+        src: tree_b
+        dest: "{{ test_root }}/withdir"
+      register: withdir_result
+
+    - name: Exclusive mode removes stray files
+      template_tree:
+        src: tree_a/
+        dest: "{{ test_root }}/exclusive"
+        exclusive: true
+        file_mode: 0644
+        directory_mode: 0755
+      register: exclusive_result
+
+    - name: Exclusive mode with ignore paths
+      template_tree:
+        src: tree_a/
+        dest: "{{ test_root }}/exclusive_ignore"
+        exclusive: true
+        exclusive_ignore:
+          - keep_dir/
+          - "{{ test_root }}/exclusive_ignore/abs_keep/"
+      register: ignore_result
+
+    - name: Assert result structure
+      tags: [molecule-idempotence-notest]
+      ansible.builtin.assert:
+        that:
+          - basic_result.changed
+          - basic_result.managed_files | length == 4
+          - basic_result.managed_directories | length == 3
+          - templated_result.changed
+          - merge_result.changed
+          - single_result.changed
+          - withdir_result.changed
+          - exclusive_result.changed
+          - exclusive_result.deleted_entries | length == 3
+          - ignore_result.deleted_entries | length == 1

@@ -1,0 +1,49 @@
+---
+- name: Prepare test environment
+  hosts: all
+  gather_facts: false
+  vars:
+    test_root: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/test-root"
+  tasks:
+    - name: Remove previous test root
+      ansible.builtin.file:
+        path: "{{ test_root }}"
+        state: absent
+
+    - name: Create test root
+      ansible.builtin.file:
+        path: "{{ test_root }}"
+        state: directory
+        mode: "0755"
+
+    - name: Create destination roots that must pre-exist
+      ansible.builtin.file:
+        path: "{{ test_root }}/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - single
+        - exclusive
+        - exclusive_ignore
+
+    - name: Create stray directories for exclusive tests
+      ansible.builtin.file:
+        path: "{{ test_root }}/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - exclusive/stray_dir
+        - exclusive_ignore/keep_dir
+        - exclusive_ignore/abs_keep
+
+    - name: Pre-seed stray files for exclusive tests
+      ansible.builtin.copy:
+        content: "stray file content\n"
+        dest: "{{ test_root }}/{{ item }}"
+        mode: "0644"
+      loop:
+        - exclusive/stray.txt
+        - exclusive/stray_dir/deep_stray.txt
+        - exclusive_ignore/stray.txt
+        - exclusive_ignore/keep_dir/keep.txt
+        - exclusive_ignore/abs_keep/abs.txt

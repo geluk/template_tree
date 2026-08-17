@@ -1,0 +1,32 @@
+---
+
+driver:
+  name: default
+  options:
+    managed: false
+    ansible_connection_options:
+      ansible_connection: local
+
+platforms:
+  - name: localhost
+
+dependency:
+  name: galaxy
+
+provisioner:
+  name: ansible
+
+verifier:
+  name: testinfra
+  options:
+    connection: local
+
+scenario:
+  test_sequence:
+    - syntax
+    - dependency
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy
