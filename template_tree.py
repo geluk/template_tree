@@ -112,13 +112,13 @@ class ActionModule(ActionBase):
                 ),
             )
 
-            filetree_lookup = self._shared_loader_obj.lookup_loader.get(
-                "community.general.filetree", loader=self._loader
-            )
-            # Filetree supports passing multiple paths, and will handle duplicates
-            # for us, by only returning the first entry it finds for a given
-            # relative path.
-            entries += filetree_lookup.run(local_paths, variables=task_vars)
+        filetree_lookup = self._shared_loader_obj.lookup_loader.get(
+            "community.general.filetree", loader=self._loader
+        )
+        # Filetree supports passing multiple paths, and will handle duplicates
+        # for us, by only returning the first entry it finds for a given
+        # relative path.
+        entries += filetree_lookup.run(local_paths, variables=task_vars)
 
         # Be explicit about the keys we use.
         filetree_used_keys = {"root", "path", "state", "src"}
@@ -130,7 +130,18 @@ class ActionModule(ActionBase):
         return entries
 
     def _get_remote_entries(self, remote_path, task_vars):
-        result = self._execute_module(
+        # The destination directory is created by this plugin, and find on a
+        # missing path only produces a misleading warning.
+        stat_result = self._execute_module(
+            module_name="ansible.builtin.stat",
+            module_args=dict(path=remote_path),
+            task_vars=task_vars,
+            tmp=None,
+        )
+        if not stat_result.get("stat", {}).get("isdir"):
+            return []
+
+        find_result = self._execute_module(
             module_name="ansible.builtin.find",
             module_args=dict(
                 file_type="any",
@@ -144,8 +155,8 @@ class ActionModule(ActionBase):
 
         # ansible-core 2.21 signals warnings through some execution context,
         # so this wiring can be removed when that's the oldest supported version
-        if "warnings" in result:
-            for warning in result["warnings"]:
+        if "warnings" in find_result:
+            for warning in find_result["warnings"]:
                 # ansible-core 2.19 and 2.20 return module warnings as
                 # WarningSummary dataclasses instead of plain strings.
                 if not isinstance(warning, str):
@@ -156,14 +167,14 @@ class ActionModule(ActionBase):
         # examined, or that not all paths have been examined. In the second case, more
         # specific information is included as warnings, which are printed above. Because
         # of that, this message is not relevant during normal operation.
-        if "msg" in result and result["msg"]:
-            self._display.v(f"find module message: {result['msg']}")
+        if "msg" in find_result and find_result["msg"]:
+            self._display.v(f"find module message: {find_result['msg']}")
 
         # Be explicit about the keys we use.
         filetree_used_keys = {"path", "isdir", "isreg"}
         entries = [
             {key: value for key, value in entry.items() if key in filetree_used_keys}
-            for entry in result["files"]
+            for entry in find_result["files"]
         ]
 
         for entry in entries:
@@ -256,12 +267,17 @@ class ActionModule(ActionBase):
         # For convenience, we'll allow specifying absolute ignore paths.
         # We rewrite them to relative paths here, so our comparison of a
         # relative path to another relative path below works.
-        exclusive_ignore = list(
-            map(
-                lambda i: i.relative_to(remote_path) if i.is_absolute() else i,
-                exclusive_ignore,
-            )
-        )
+        normalized_exclusive_ignore = []
+        for ign in exclusive_ignore:
+            if ign.is_absolute():
+                if not ign.is_relative_to(remote_path):
+                    self._display.warning(
+                        f"exclusive_ignore path '{ign}' is not a subpath of '{remote_path}'"
+                    )
+                    continue
+                ign = ign.relative_to(remote_path)
+            normalized_exclusive_ignore.append(ign)
+        exclusive_ignore = normalized_exclusive_ignore
 
         for remote_entry in remote_entries:
             absolute_path: PurePath = remote_entry["path"]
